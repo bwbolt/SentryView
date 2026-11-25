@@ -203,13 +203,15 @@ class CameraSession(QThread):
 
     def _error_summary(self) -> str:
         """Pick the most useful line out of ffmpeg's recent output."""
-        for line in reversed(self._stderr_tail):
-            low = line.lower()
-            if any(k in low for k in ("error", "failed", "refused", "timed out",
-                                      "no route", "unauthorized", "401", "404",
-                                      "invalid", "not found")):
-                return re.sub(r"^\[[^\]]+\]\s*", "", line)[:200]
-        return self._stderr_tail[-1][:200] if self._stderr_tail else "Stream ended"
+        if self._stderr_tail:
+            # Same translation the Test-connection dialog uses, so a tile and
+            # the dialog never disagree about what went wrong.
+            from .probe import friendly_error
+
+            summary = friendly_error("\n".join(self._stderr_tail))
+            if summary:
+                return summary[:200]
+        return "Stream ended"
 
     # --------------------------------------------------------------------- loop
     def run(self) -> None:

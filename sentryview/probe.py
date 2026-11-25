@@ -24,6 +24,63 @@ _FPS_RE = re.compile(r",\s*([\d.]+)\s*fps")
 
 PREVIEW_WIDTH = 480
 
+_ERRNO_RE = re.compile(r"Error number (-?\d+) occurred")
+
+# When the C library cannot describe an error, FFmpeg falls back to printing
+# the raw errno - which is most of the time on Windows. The numbers differ per
+# platform (Windows ETIMEDOUT is 138, Linux's is 110), so the wording has to
+# cover both readings of a code where they collide.
+_HINTS = {
+    "timed out": (
+        "The address is reachable or wrong, but nothing replied in time. Check "
+        "that the camera's IP has not changed, that this computer is on the "
+        "same network as the camera, and that any VPN is disconnected — a VPN "
+        "routes local addresses away from your LAN. On Windows you can test "
+        "the camera directly with:\n"
+        "    Test-NetConnection <camera-ip> -Port 554"
+    ),
+    "no route": (
+        "This computer cannot reach that address at all. It is usually a "
+        "different subnet, a guest Wi-Fi network that isolates devices, or an "
+        "active VPN."
+    ),
+    "unreachable": (
+        "This computer cannot reach that address at all. It is usually a "
+        "different subnet, a guest Wi-Fi network that isolates devices, or an "
+        "active VPN."
+    ),
+    "refused": (
+        "Something answered but nothing is listening on that port. RTSP is "
+        "normally 554 — check the port, and that RTSP/ONVIF is enabled in the "
+        "camera's own settings."
+    ),
+    "authentication": (
+        "Some cameras need a separate RTSP user, distinct from the web login. "
+        "Create one in the camera's settings if the main password is rejected."
+    ),
+    "path": (
+        "The host is right but the part after it is wrong. Check the camera's "
+        "manual for its exact RTSP path — Help ▸ Finding Your Camera's RTSP "
+        "URL lists the common ones."
+    ),
+}
+
+_ERRNO_MESSAGES = {
+    138: "Timed out — the camera never answered",
+    60: "Timed out — the camera never answered",
+    110: "Timed out, or there is no route to the camera",
+    107: "Connection refused — the camera said no on that port",
+    111: "Connection refused — the camera said no on that port",
+    61: "Connection refused — the camera said no on that port",
+    118: "Network unreachable — the camera is not on this network",
+    65: "No route to the camera — is it on this network?",
+    116: "The network is down",
+    108: "The camera closed the connection",
+    104: "The camera closed the connection",
+    54: "The camera closed the connection",
+    106: "The connection was aborted",
+}
+
 
 def _creation_flags() -> int:
     return getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
@@ -39,6 +96,7 @@ class ProbeResult:
     fps: float = 0.0
     audio: str = ""
     error: str = ""
+    hint: str = ""
     log: list = field(default_factory=list)
 
     def summary(self) -> str:
@@ -144,13 +202,34 @@ def grab_frame(url: str, transport: str = "tcp", timeout: int = 25) -> ProbeResu
             result.ok = True
 
     if not result.ok and not result.error:
-        result.error = _friendly_error(text)
+        result.error = friendly_error(text)
+    if not result.ok:
+        result.hint = hint_for(result.error)
     return result
 
 
-def _friendly_error(text: str) -> str:
+def hint_for(message: str) -> str:
+    """A next step to try, for the failures people actually hit."""
+    low = (message or "").lower()
+    for needle, hint in _HINTS.items():
+        if needle in low:
+            return hint
+    return ""
+
+
+def friendly_error(text: str) -> str:
     """Translate ffmpeg's output into something actionable."""
     low = text.lower()
+
+    # Numeric errnos first: they are precise, and on Windows they are all we get.
+    for match in _ERRNO_RE.finditer(text):
+        try:
+            code = abs(int(match.group(1)))
+        except ValueError:
+            continue
+        if code in _ERRNO_MESSAGES:
+            return _ERRNO_MESSAGES[code]
+
     rules = [
         ("401", "Authentication failed — check the username and password"),
         ("unauthorized", "Authentication failed — check the username and password"),

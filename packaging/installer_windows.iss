@@ -3,7 +3,7 @@
 ; Expects a completed PyInstaller build in dist\SentryView\
 
 #define AppName        "SentryView"
-#define AppVersion     "1.0.0"
+#define AppVersion     "1.0.1"
 #define AppPublisher   "SentryView"
 #define AppExeName     "SentryView.exe"
 

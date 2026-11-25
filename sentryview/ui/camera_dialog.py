@@ -147,6 +147,14 @@ class CameraDialog(QDialog):
         self.status_label.setProperty("role", "subtitle")
         box.addWidget(self.status_label)
 
+        self.hint_label = QLabel("")
+        self.hint_label.setWordWrap(True)
+        self.hint_label.setProperty("role", "hint")
+        self.hint_label.setVisible(False)
+        self.hint_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
+        box.addWidget(self.hint_label)
+
         self.log_toggle = QPushButton("Show details")
         self.log_toggle.setProperty("variant", "ghost")
         self.log_toggle.setCheckable(True)
@@ -199,6 +207,7 @@ class CameraDialog(QDialog):
         self.test_button.setEnabled(False)
         self.test_button.setText("Testing…")
         self.status_label.setText("Connecting to the camera…")
+        self.hint_label.setVisible(False)
         self.preview.placeholder = "Connecting…"
         self.preview.clear_frame()
 
@@ -218,6 +227,10 @@ class CameraDialog(QDialog):
         else:
             self.preview.placeholder = "No video"
             self.preview.clear_frame()
+
+        hint = getattr(result, "hint", "")
+        self.hint_label.setText(hint)
+        self.hint_label.setVisible(bool(hint))
 
         self.log_view.setPlainText("\n".join(result.log))
         self.log_toggle.setVisible(bool(result.log))
