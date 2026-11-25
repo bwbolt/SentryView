@@ -15,6 +15,7 @@ from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QImage
 
 from .paths import find_ffmpeg
+from .util import redact_credentials
 
 _RAW_DIMS_RE = re.compile(r"Video:\s*rawvideo.*?,\s*(\d{2,5})x(\d{2,5})")
 _IN_VIDEO_RE = re.compile(
@@ -175,7 +176,8 @@ def grab_frame(url: str, transport: str = "tcp", timeout: int = 25) -> ProbeResu
         reader.join(timeout=4)
 
     text = b"".join(chunks["err"]).decode("utf-8", "replace")
-    result.log = [line for line in text.splitlines() if line.strip()][-25:]
+    result.log = [redact_credentials(line)
+                  for line in text.splitlines() if line.strip()][-25:]
 
     m = _IN_VIDEO_RE.search(text)
     if m:
@@ -219,6 +221,7 @@ def hint_for(message: str) -> str:
 
 def friendly_error(text: str) -> str:
     """Translate ffmpeg's output into something actionable."""
+    text = redact_credentials(text)
     low = text.lower()
 
     # Numeric errnos first: they are precise, and on Windows they are all we get.

@@ -22,7 +22,7 @@ to your computer and nowhere else.
 
 ### macOS
 
-1. Open `SentryView-1.1.0-macOS-x86_64.dmg`.
+1. Open `SentryView-1.1.1-macOS-x86_64.dmg`.
 2. Drag **SentryView** to **Applications**.
 3. **The first launch needs one extra step.** This build is not signed with a
    paid Apple Developer certificate, so macOS will refuse a normal
@@ -50,7 +50,7 @@ to your computer and nowhere else.
 
 ### Windows
 
-1. Run `SentryView-1.1.0-Windows-Setup.exe`.
+1. Run `SentryView-1.1.1-Windows-Setup.exe`.
 2. Windows SmartScreen will show *"Windows protected your PC"*, because the
    installer is not signed with a paid code-signing certificate. Click
    **More info → Run anyway**.

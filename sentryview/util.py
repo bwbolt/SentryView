@@ -4,6 +4,21 @@ from __future__ import annotations
 import datetime as dt
 
 
+_CREDENTIAL_RE = __import__("re").compile(
+    r"([a-zA-Z][a-zA-Z0-9+.\-]*://)([^:/@\s]+):([^@/\s]+)@")
+
+
+def redact_credentials(text: str) -> str:
+    """Mask passwords in anything that might be shown or logged.
+
+    FFmpeg echoes the full stream URL, credentials included, and we surface
+    its output in the Test-connection details pane and on camera tiles.
+    """
+    if not text:
+        return text
+    return _CREDENTIAL_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}:*****@", text)
+
+
 def human_size(num_bytes: float) -> str:
     step = 1024.0
     for unit in ("B", "KB", "MB", "GB", "TB"):

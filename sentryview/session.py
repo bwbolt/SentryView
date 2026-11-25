@@ -19,6 +19,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtGui import QImage
 
 from .config import Camera, Storage
+from .util import redact_credentials
 from .paths import find_ffmpeg
 
 # Connection/record states surfaced to the UI.
@@ -177,7 +178,7 @@ class CameraSession(QThread):
         if stream is None:
             return
         for raw in iter(stream.readline, b""):
-            line = raw.decode("utf-8", "replace").rstrip()
+            line = redact_credentials(raw.decode("utf-8", "replace").rstrip())
             if not line:
                 continue
 
