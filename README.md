@@ -4,7 +4,8 @@ A desktop app for watching and recording the RTSP cameras on your own network.
 No account, no cloud, no subscription — video goes straight from your cameras
 to your computer and nowhere else.
 
-- **Unlimited cameras.** Add any camera that speaks RTSP, by URL.
+- **Unlimited cameras.** Add any camera that speaks RTSP, by URL — or press
+  **Find cameras** and let SentryView locate them for you.
 - **Live wall.** Auto, 1×1, 2×2, 3×3 or 4×4 grid; double-click any tile to
   maximise it.
 - **Continuous recording, split by day.** Optional. Clips land in dated
@@ -21,7 +22,7 @@ to your computer and nowhere else.
 
 ### macOS
 
-1. Open `SentryView-1.0.1-macOS-x86_64.dmg`.
+1. Open `SentryView-1.1.0-macOS-x86_64.dmg`.
 2. Drag **SentryView** to **Applications**.
 3. **The first launch needs one extra step.** This build is not signed with a
    paid Apple Developer certificate, so macOS will refuse a normal
@@ -49,7 +50,7 @@ to your computer and nowhere else.
 
 ### Windows
 
-1. Run `SentryView-1.0.1-Windows-Setup.exe`.
+1. Run `SentryView-1.1.0-Windows-Setup.exe`.
 2. Windows SmartScreen will show *"Windows protected your PC"*, because the
    installer is not signed with a paid code-signing certificate. Click
    **More info → Run anyway**.
@@ -102,6 +103,28 @@ generic error.
 **Tip:** most cameras publish a lower-resolution *substream* (often
 `subtype=1` or `_sub`). It is much lighter to view and record, and it is
 usually plenty for an overview tile.
+
+### Let SentryView find them
+
+If you don't know the camera's address, press **Find cameras…** next to the
+RTSP URL field. It sweeps the network this computer is on, asks anything that
+answers on an RTSP port who it is, and identifies the brand from the
+authentication realm — then fills in the address with the stream path that
+brand actually uses. Pick one from the list and all that's left is the
+username and password.
+
+It finds ONVIF cameras by multicast first, then sweeps the usual RTSP ports
+(554, 8554, 88, 7447; **Thorough** adds more). You can type a different range
+if the cameras live on another subnet — `192.168.5.0/24` or `10.0.1.20-80`.
+
+Two caveats worth knowing:
+
+- Scanning only reaches the network this computer is on. A camera at a
+  different site, or behind a VPN, will not be found.
+- On a **corporate or managed network**, a port sweep may be logged or flagged
+  by security monitoring. It is an ordinary thing for camera software to do,
+  but check with whoever runs the network before scanning at work — or skip
+  the scan and type the address in directly.
 
 ### No camera handy?
 

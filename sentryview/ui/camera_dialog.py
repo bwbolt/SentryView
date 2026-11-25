@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox,
 
 from ..config import Camera
 from ..probe import ProbeWorker
+from .scan_dialog import ScanDialog
 from . import theme
 from .widgets import VideoSurface
 
@@ -84,7 +85,15 @@ class CameraDialog(QDialog):
 
         self.url_edit = QLineEdit()
         self.url_edit.setPlaceholderText("rtsp://192.168.1.50:554/stream1")
-        form.addRow("RTSP URL", self.url_edit)
+        url_row = QHBoxLayout()
+        url_row.setSpacing(6)
+        url_row.addWidget(self.url_edit, 1)
+        self.scan_button = QPushButton("Find cameras…")
+        self.scan_button.setToolTip(
+            "Scan this network for cameras and fill the address in")
+        self.scan_button.clicked.connect(self._scan_network)
+        url_row.addWidget(self.scan_button)
+        form.addRow("RTSP URL", url_row)
 
         self.user_edit = QLineEdit()
         self.user_edit.setPlaceholderText("optional")
@@ -196,6 +205,22 @@ class CameraDialog(QDialog):
 
     def result_camera(self) -> Camera:
         return self._collect()
+
+    def _scan_network(self) -> None:
+        dialog = ScanDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted or not dialog.selected:
+            return
+        found = dialog.selected
+        self.url_edit.setText(found.suggested_url())
+        if not self.name_edit.text().strip():
+            label = found.brand or "Camera"
+            self.name_edit.setText(f"{label} {found.host.rsplit('.', 1)[-1]}")
+        self._show_error("")
+        note = "Address filled in. Add the camera's RTSP username and password, "
+        note += "then press Test connection."
+        self.status_label.setStyleSheet(f"color: {theme.MUTED}; font-size: 12px;")
+        self.status_label.setText(note)
+        (self.user_edit if found.needs_auth else self.url_edit).setFocus()
 
     # --------------------------------------------------------------------- test
     def _test(self) -> None:
