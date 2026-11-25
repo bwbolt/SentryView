@@ -1,0 +1,160 @@
+name: Build installers
+
+# Produces a Windows installer and macOS disk images.
+# Run it by hand from the Actions tab, or push a tag like v1.0.0 to also
+# create a GitHub release with the installers attached.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install PySide6 imageio-ffmpeg pyinstaller
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Read version
+        shell: bash
+        run: |
+          python - <<'EOF' >> "$GITHUB_ENV"
+          import pathlib, re
+          text = pathlib.Path("sentryview/__init__.py").read_text()
+          print("APP_VERSION=" + re.search(r'__version__ = "([^"]+)"', text).group(1))
+          EOF
+
+      - name: Generate icons
+        run: python packaging/make_icon.py
+
+      - name: Build application
+        env:
+          SENTRYVIEW_ROOT: ${{ github.workspace }}
+        run: |
+          python -m PyInstaller --noconfirm --clean `
+            --distpath dist --workpath build packaging/SentryView.spec
+
+      - name: Verify the bundled ffmpeg
+        run: |
+          $ff = "dist/SentryView/_internal/bin/ffmpeg.exe"
+          if (-not (Test-Path $ff)) { $ff = "dist/SentryView/bin/ffmpeg.exe" }
+          if (-not (Test-Path $ff)) { throw "ffmpeg.exe missing from the build" }
+          & $ff -hide_banner -version | Select-Object -First 1
+
+      - name: Smoke test (starts, then quits)
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:SENTRYVIEW_DATA_DIR = "$env:TEMP\sv-ci"
+          # A windowed build has no console, so capture output to a file or a
+          # startup crash would show up here as a bare exit code.
+          $p = Start-Process -FilePath "dist/SentryView/SentryView.exe" -PassThru `
+                 -RedirectStandardError "$env:TEMP\sv-err.txt" `
+                 -RedirectStandardOutput "$env:TEMP\sv-out.txt"
+          Start-Sleep -Seconds 25
+          if ($p.HasExited) {
+            Write-Host "--- stderr ---"
+            if (Test-Path "$env:TEMP\sv-err.txt") { Get-Content "$env:TEMP\sv-err.txt" }
+            Write-Host "--- stdout ---"
+            if (Test-Path "$env:TEMP\sv-out.txt") { Get-Content "$env:TEMP\sv-out.txt" }
+            throw "App exited early with code $($p.ExitCode)"
+          }
+          Stop-Process -Id $p.Id -Force
+          Write-Host "App stayed running."
+
+      - name: Build installer
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" packaging\installer_windows.iss
+
+      - name: Build portable zip
+        run: |
+          Compress-Archive -Path dist/SentryView `
+            -DestinationPath "dist/SentryView-$env:APP_VERSION-Windows-portable.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            dist/*.exe
+            dist/*.zip
+          if-no-files-found: error
+
+  macos:
+    name: macOS ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13     # Intel
+            label: Intel
+          - runner: macos-14     # Apple Silicon
+            label: Apple Silicon
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install PySide6 imageio-ffmpeg pyinstaller
+
+      - name: Build app and DMG
+        env:
+          PYTHON: python
+        run: bash packaging/build_macos.sh
+
+      - name: Smoke test (starts, then quits)
+        env:
+          QT_QPA_PLATFORM: offscreen
+          SENTRYVIEW_DATA_DIR: ${{ runner.temp }}/sv-ci
+        run: |
+          ./dist/SentryView.app/Contents/MacOS/SentryView > /tmp/sv.log 2>&1 &
+          PID=$!
+          sleep 25
+          if ! kill -0 $PID 2>/dev/null; then
+            echo "--- app output ---"; cat /tmp/sv.log || true
+            echo "App exited early"; exit 1
+          fi
+          kill -TERM $PID
+          echo "App stayed running."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.runner }}-dmg
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  release:
+    name: Attach to release
+    needs: [windows, macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+          generate_release_notes: true

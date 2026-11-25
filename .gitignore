@@ -1,0 +1,14 @@
+.venv/
+.venv-win/
+build/
+dist/
+__pycache__/
+*.pyc
+assets/icon_*.png
+assets/icon.icns
+assets/icon.ico
+assets/icon.png
+assets/check*.png
+assets/dot*.png
+.DS_Store
+*.swp

@@ -1,0 +1,6 @@
+# Runtime dependencies. FFmpeg arrives as a wheel - no system install needed.
+PySide6>=6.5,<7
+imageio-ffmpeg>=0.4.9
+
+# Build only (not needed to run from source):
+#   pyinstaller>=6.0
